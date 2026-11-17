@@ -202,3 +202,32 @@ def test_losses_do_not_record_scores_and_new_sessions_start_empty():
     fresh = AppTest.from_file(APP, default_timeout=10).run()
     assert not fresh.exception
     assert fresh.session_state.high_scores == {}
+
+
+def test_investigation_persists_and_sources_are_visible(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    app = AppTest.from_file(APP, default_timeout=10).run()
+    [b for b in app.button if b.label == "Investigate case"][0].click().run()
+    assert not app.exception
+    result = app.session_state.investigation_result
+    assert result["bug_found"]
+    assert result["sources"]
+    assert "Missing OPENAI_API_KEY" in result["diagnostic"]
+    app.run()
+    assert not app.exception
+    assert app.session_state.investigation_result == result
+
+
+def test_completed_hard_turn_uses_recorded_hint(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    app = AppTest.from_file(APP, default_timeout=10).run()
+    app.sidebar.selectbox[0].select("Hard").run()
+    app.session_state.secret = 50
+    app.text_input[0].set_value("50")
+    app.button[0].click().run()
+    assert app.session_state.recorded_turns[0]["reported_hint"] == "Correct"
+    selector = [s for s in app.selectbox if s.label == "Investigation case"][0]
+    selector.select("Completed game turn 1").run()
+    [b for b in app.button if b.label == "Investigate case"][0].click().run()
+    assert not app.exception
+    assert app.session_state.investigation_result["expected_hint"] == "Correct"

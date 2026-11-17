@@ -1,4 +1,6 @@
 import random
+import json
+import os
 
 import streamlit as st
 
@@ -19,6 +21,7 @@ def reset_game(difficulty):
     st.session_state.secret = random.randint(low, high)
     st.session_state.score = 0
     st.session_state.history = []
+    st.session_state.recorded_turns = []
     st.session_state[f"guess_input_{difficulty}"] = ""
 
 
@@ -129,6 +132,10 @@ def render_game(difficulty, attempt_limit, low, high):
             st.session_state.attempts += 1
             st.session_state.history.append(guess_int)
             outcome = check_guess(guess_int, st.session_state.secret)
+            st.session_state.recorded_turns.append({
+                "secret": st.session_state.secret, "guess": guess_int,
+                "reported_hint": {"Win": "Correct", "Too High": "Lower", "Too Low": "Higher"}[outcome],
+            })
             if show_hint:
                 render_hint(outcome)
             st.session_state.score = update_score(
@@ -167,46 +174,60 @@ def render_game(difficulty, attempt_limit, low, high):
 
 def render_investigator():
     st.header("AI Investigator")
-    st.caption(
-        "Investigate a completed turn or a labeled demonstration. "
-        "Python verifies the hint; AI only explains it."
-    )
+    st.write("Reproduce a suspicious hint, compare it with the game rules, and get a sourced AI explanation.")
+    if not os.getenv("OPENAI_API_KEY", "").strip():
+        st.warning("AI is not configured. Python checks still work; add OPENAI_API_KEY to .env and restart for AI explanations.")
+    else:
+        st.caption("API key detected. Connection is checked when you investigate; credentials are never displayed.")
     cases = {
-        "Demo: 42, 25, Lower (incorrect)": {
-            "secret": 42, "guess": 25, "reported_hint": "Lower"
-        },
-        "Demo: 42, 70, Lower (correct)": {
-            "secret": 42, "guess": 70, "reported_hint": "Lower"
-        },
-        "Demo: 42, 42, Higher (missed win)": {
-            "secret": 42, "guess": 42, "reported_hint": "Higher"
-        },
+        "Reversed hint": {"secret": 42, "guess": 25, "reported_hint": "Lower"},
+        "Correct hint": {"secret": 42, "guess": 70, "reported_hint": "Lower"},
+        "Missed win": {"secret": 42, "guess": 42, "reported_hint": "Higher"},
     }
     if st.session_state.status != "playing":
-        for number, guess in enumerate(st.session_state.history, 1):
-            if isinstance(guess, int):
-                outcome = check_guess(guess, st.session_state.secret)
-                reported = {
-                    "Win": "Correct",
-                    "Too High": "Lower",
-                    "Too Low": "Higher",
-                }[outcome]
-                cases[f"Completed game turn {number}"] = {
-                    "secret": st.session_state.secret,
-                    "guess": guess,
-                    "reported_hint": reported,
-                }
-
+        for i, turn in enumerate(st.session_state.get("recorded_turns", []), 1):
+            cases[f"Completed game turn {i}"] = turn
     case_name = st.selectbox("Investigation case", list(cases))
-    if st.button("Investigate case"):
-        result = investigate_turn(cases[case_name])
-        st.info(f"Response mode: {result.mode}")
-        st.write(f"Expected hint: **{result.expected_hint}**")
-        st.write(f"Bug found: **{result.bug_found}**")
-        st.write(result.explanation)
-        if result.source_ids:
-            with st.expander("Retrieved debugging notes"):
-                st.write(", ".join(result.source_ids))
+    original = cases[case_name]
+    is_recorded = case_name.startswith("Completed")
+    case_difficulty = st.session_state.game_difficulty if is_recorded else "Normal"
+    case_low, case_high = get_range_for_difficulty(case_difficulty)
+    st.caption("Demonstration cases are editable and use the Normal range (1–100). Completed turns preserve the recorded game data.")
+    with st.form("investigate_form"):
+        cols = st.columns(3)
+        secret = cols[0].number_input("Secret", case_low, case_high, original["secret"], key=f"secret_{case_name}", disabled=is_recorded)
+        guess = cols[1].number_input("Guess", case_low, case_high, original["guess"], key=f"guess_{case_name}", disabled=is_recorded)
+        hints = ["Higher", "Lower", "Correct"]
+        hint = cols[2].selectbox("Reported hint", hints, index=hints.index(original["reported_hint"]), key=f"hint_{case_name}", disabled=is_recorded)
+        submitted = st.form_submit_button("Investigate case")
+    if submitted:
+        turn = {"secret": int(secret), "guess": int(guess), "reported_hint": hint}
+        with st.spinner("Checking the turn, retrieving notes, and requesting an explanation…"):
+            result = investigate_turn(turn, difficulty=case_difficulty)
+        st.session_state.investigation_result = {"case": case_name, "input": turn, **result.as_dict()}
+    report = st.session_state.get("investigation_result")
+    if not report:
+        st.caption("Select a case and click Investigate case to begin.")
+        return
+    st.divider()
+    st.caption(f"Last investigation: {report['case']} — secret {report['input']['secret']}, guess {report['input']['guess']}")
+    if report["bug_found"]:
+        st.error(f"Incorrect hint: {report['input']['reported_hint']} → {report['expected_hint']}")
+    else:
+        st.success(f"Hint verified: {report['expected_hint']}")
+    st.write(report["explanation"])
+    st.caption(f"Response mode: {report['mode']}")
+    if report["diagnostic"]:
+        st.warning(report["diagnostic"])
+    with st.expander("Retrieved debugging notes"):
+        for source in report["sources"]:
+            st.markdown(f"**{source['source_id']}**")
+            st.write(source["text"])
+        if not report["sources"]:
+            st.write("No relevant notes found.")
+    with st.expander("Investigation steps", expanded=True):
+        st.dataframe(report["events"], hide_index=True, use_container_width=True)
+    st.download_button("Download investigation log", json.dumps(report, indent=2), "investigation.json", "application/json")
 
 
 def render_about():
@@ -233,7 +254,7 @@ def render_about():
     )
 
 
-st.set_page_config(page_title="Glitchy Guesser", page_icon="🎮")
+st.set_page_config(page_title="Glitchy Guesser", page_icon="🎮", layout="wide")
 st.title("🎮 Game Glitch Investigator AI")
 st.caption("Play the game, investigate hints, and review the evaluation.")
 

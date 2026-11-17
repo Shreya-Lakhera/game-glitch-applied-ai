@@ -1,3 +1,22 @@
+## Investigator repair update
+
+The investigator now loads the repository `.env` file (existing environment variables take precedence), displays actionable missing-key/API errors, preserves the last investigation across UI reruns, allows edited demonstration cases, shows retrieved note text and observable workflow steps, and exports investigation JSON. Completed-game investigations use saved turns and the correct difficulty. Injected test clients are labeled mocked-model.
+
+Windows setup, from this repository:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+# Only create .env if it does not already exist:
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+notepad .env
+# Set OPENAI_API_KEY locally, save, then restart:
+.\.venv\Scripts\python.exe -m streamlit run app.py
+```
+
+Verification of this repair: `python -m pytest -q` — **26 passed**. These include Streamlit AppTest interaction checks, missing credentials, malformed responses, bounded repair, and HTTP authentication failure. Live API generation and visual browser inspection were not verified in this repair environment. The original project documentation below may describe additional work; this repair does not certify every rubric claim.
+
+---
+
 # Game Glitch Investigator AI
 
 This project preserves the Module 1 Streamlit number-guessing game and adds
