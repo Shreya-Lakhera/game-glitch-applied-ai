@@ -1,0 +1,14 @@
+flowchart TD
+    UI[Streamlit game] --> T[Recorded turn or demo case]
+    CLI[CLI demo] --> T
+    T --> V[Input validation]
+    V --> D[Deterministic Python check]
+    D --> R[TF-IDF-like token retrieval]
+    R --> M[Language model JSON]
+    M --> O[Output validation]
+    O -->|invalid once| Repair[Bounded repair]
+    Repair --> O
+    O -->|valid| Result[Investigation result]
+    O -->|second failure/API error| F[Clearly labeled deterministic fallback]
+    Result --> UI
+    F --> UI

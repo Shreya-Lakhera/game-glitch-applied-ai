@@ -2,53 +2,13 @@ import random
 
 import streamlit as st
 
-from logic_utils import check_guess
-
-
-def get_range_for_difficulty(difficulty: str):
-    if difficulty == "Easy":
-        return 1, 20
-    if difficulty == "Normal":
-        return 1, 100
-    if difficulty == "Hard":
-        return 1, 50
-    return 1, 100
-
-
-def parse_guess(raw: str):
-    if raw is None:
-        return False, None, "Enter a guess."
-
-    if raw == "":
-        return False, None, "Enter a guess."
-
-    try:
-        if "." in raw:
-            value = int(float(raw))
-        else:
-            value = int(raw)
-    except Exception:
-        return False, None, "That is not a number."
-
-    return True, value, None
-
-
-def update_score(current_score: int, outcome: str, attempt_number: int):
-    if outcome == "Win":
-        points = 100 - 10 * (attempt_number + 1)
-        if points < 10:
-            points = 10
-        return current_score + points
-
-    if outcome == "Too High":
-        if attempt_number % 2 == 0:
-            return current_score + 5
-        return current_score - 5
-
-    if outcome == "Too Low":
-        return current_score - 5
-
-    return current_score
+from investigator import investigate_turn
+from logic_utils import (
+    check_guess,
+    get_range_for_difficulty,
+    parse_guess,
+    update_score,
+)
 
 
 def reset_game(difficulty):
@@ -256,3 +216,46 @@ attempts_banner.info(
 st.divider()
 render_round_summary(attempt_limit, show_hint)
 render_high_scores(difficulty)
+
+st.header("AI Investigator")
+st.caption(
+    "Investigate a completed turn or a labeled demonstration. "
+    "The Python check always decides whether the hint was correct."
+)
+demo_cases = {
+    "Demo: 42, 25, Lower (incorrect)": {
+        "secret": 42, "guess": 25, "reported_hint": "Lower"
+    },
+    "Demo: 42, 70, Lower (correct)": {
+        "secret": 42, "guess": 70, "reported_hint": "Lower"
+    },
+    "Demo: 42, 42, Higher (missed win)": {
+        "secret": 42, "guess": 42, "reported_hint": "Higher"
+    },
+}
+if st.session_state.status != "playing":
+    completed_turns = {}
+    for number, guess in enumerate(st.session_state.history, 1):
+        if isinstance(guess, int):
+            outcome = check_guess(guess, st.session_state.secret)
+            reported = {
+                "Win": "Correct",
+                "Too High": "Lower",
+                "Too Low": "Higher",
+            }[outcome]
+            completed_turns[f"Completed game turn {number}"] = {
+                "secret": st.session_state.secret,
+                "guess": guess,
+                "reported_hint": reported,
+            }
+    demo_cases.update(completed_turns)
+case_name = st.selectbox("Investigation case", list(demo_cases))
+if st.button("Investigate case"):
+    result = investigate_turn(demo_cases[case_name])
+    st.write(f"Mode: {result.mode}")
+    st.write(f"Expected hint: **{result.expected_hint}**")
+    st.write(f"Bug found: **{result.bug_found}**")
+    st.write(result.explanation)
+    if result.source_ids:
+        with st.expander("Retrieved sources"):
+            st.write(", ".join(result.source_ids))

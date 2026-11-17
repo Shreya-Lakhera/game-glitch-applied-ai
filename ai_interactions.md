@@ -176,3 +176,26 @@ Basic style check: 0 violations in 5 files.
 **Which did you prefer and why?**
 
 <!-- Your conclusion -->
+
+## Project 4 investigator evidence
+
+The shared `investigator.py` pipeline validates a recorded turn, computes
+the expected hint in Python, retrieves project-authored Markdown sections,
+optionally calls the configured model, validates its JSON, and permits one
+repair before an explicit deterministic fallback. `demo.py` and the
+Streamlit section call the same pipeline. With no credential configured, the
+observed CLI mode was `deterministic fallback`; no live-model result or
+retrieval improvement claim is reported.
+
+Verification performed in this session:
+
+```text
+python -m pytest -q
+17 passed, 1 warning
+python tools/check_style.py
+Basic style check: 0 violations in 10 files.
+python evaluate.py
+Deterministic checks: 4/4 passed
+Live AI successes: 0
+Fallbacks: 1
+```

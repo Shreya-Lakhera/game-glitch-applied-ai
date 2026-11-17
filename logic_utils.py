@@ -1,37 +1,18 @@
 def get_range_for_difficulty(difficulty: str):
-    """Describe the inclusive bounds for a difficulty (not implemented).
-
-    Args:
-        difficulty (str): Difficulty label: Easy, Normal, or Hard.
-
-    Returns:
-        tuple[int, int]: Intended lower and upper bounds, inclusive.
-
-    Raises:
-        NotImplementedError: Always; this helper is still a placeholder.
-    """
-    raise NotImplementedError(
-        "Refactor this function from app.py into logic_utils.py"
-    )
+    """Return the inclusive number range for a difficulty."""
+    ranges = {"Easy": (1, 20), "Normal": (1, 100), "Hard": (1, 50)}
+    return ranges.get(difficulty, ranges["Normal"])
 
 
 def parse_guess(raw: str):
-    """Describe parsing a guess into an integer (not implemented).
-
-    Args:
-        raw (str): User-entered guess text.
-
-    Returns:
-        tuple[bool, int | None, str | None]: Intended success flag, parsed
-        guess, and error message. A successful parse has no error message;
-        a failed parse has no integer value.
-
-    Raises:
-        NotImplementedError: Always; this helper is still a placeholder.
-    """
-    raise NotImplementedError(
-        "Refactor this function from app.py into logic_utils.py"
-    )
+    """Parse user-entered text into an integer and a user-facing error."""
+    if raw is None or raw == "":
+        return False, None, "Enter a guess."
+    try:
+        value = int(float(raw)) if "." in raw else int(raw)
+    except (TypeError, ValueError):
+        return False, None, "That is not a number."
+    return True, value, None
 
 
 def check_guess(guess, secret):
@@ -60,19 +41,15 @@ def check_guess(guess, secret):
 
 
 def update_score(current_score: int, outcome: str, attempt_number: int):
-    """Describe updating a round's score (not implemented).
-
-    Args:
-        current_score (int): Score before processing the guess.
-        outcome (str): Guess result: Win, Too High, or Too Low.
-        attempt_number (int): One-based number of the submitted attempt.
-
-    Returns:
-        int: Intended score after applying the scoring rules.
-
-    Raises:
-        NotImplementedError: Always; this helper is still a placeholder.
-    """
-    raise NotImplementedError(
-        "Refactor this function from app.py into logic_utils.py"
-    )
+    """Apply the game's scoring rules to a submitted attempt."""
+    if outcome == "Win":
+        return current_score + max(10, 100 - 10 * (attempt_number + 1))
+    if outcome == "Too High":
+        return (
+            current_score + 5
+            if attempt_number % 2 == 0
+            else current_score - 5
+        )
+    if outcome == "Too Low":
+        return current_score - 5
+    return current_score

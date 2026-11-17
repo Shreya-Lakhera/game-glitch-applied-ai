@@ -1,0 +1,5 @@
+[
+  {"secret": 42, "guess": 25, "reported_hint": "Lower"},
+  {"secret": 42, "guess": 70, "reported_hint": "Lower"},
+  {"secret": 42, "guess": 42, "reported_hint": "Higher"}
+]
